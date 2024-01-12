@@ -1,6 +1,7 @@
 from random import random_ui64
 from field import FieldElement
 import benchmark
+from algorithm import parallelize
 
 #=============================================================================
 # Helper functions
@@ -51,16 +52,35 @@ fn half_vector( vec: DynamicVector[FieldElement], start: Int, size: Int ) -> Dyn
         result[i + half_size] = vec[start + i*2 + 1]
     return result
 
-fn fft_over_finite_field( inout P: DynamicVector[FieldElement], offset: Int, size: Int, w: FieldElement ):
+
+fn fft_over_finite_field(
+    inout P: DynamicVector[FieldElement],
+    offset: Int,
+    size: Int,
+    w: FieldElement,
+    threads: Int = 0,
+):
     if size == 1:
         return
 
     let w_square = w * w
     var P_ = half_vector( P, 0, size )
     let half_size = size // 2
-    fft_over_finite_field( P_, 0, half_size, w_square )
-    fft_over_finite_field( P_, half_size, half_size, w_square )
-    
+
+    @parameter
+    fn recurse( i: Int ):
+        let threads_ = 0 if threads == 0 else threads // 2 - 1
+        if i == 0:
+            fft_over_finite_field( P_, 0, half_size, w_square, threads_ )
+        else:
+            fft_over_finite_field( P_, half_size, half_size, w_square, threads_ )
+
+    if threads == 0:
+        recurse(0)
+        recurse(1)
+    else:
+        parallelize[recurse]( 2, 2 )
+
     var w_power = FieldElement(1)
     for j in range(half_size):
         let u = P_[j]
@@ -89,7 +109,7 @@ fn main() raises:
 
     @parameter
     fn bench():
-        _ = fft_over_finite_field( values, 0, size, g )
+        _ = fft_over_finite_field( values, 0, size, g, 32 )
 
     let report = benchmark.run[bench]( 1, 3, 4, 10 )
     print( "mean runtime:", report.mean("s") )
