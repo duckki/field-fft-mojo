@@ -3,6 +3,7 @@ import subprocess
 scripts = [
     "python/fft-python.py",
     "mojo/fft-mojo.mojo",
+    "mojo/fft-optimized.mojo",
 ]
 
 for s in scripts:

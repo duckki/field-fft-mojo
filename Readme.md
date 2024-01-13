@@ -32,7 +32,12 @@ def fft_over_finite_field( P: list[FieldElement], w: FieldElement ) -> list[Fiel
 It depends on the `FieldElement` class, which is defined in the [`python/field.py`](python/field.py). The characteristic prime of the field is hardcoded as `3 * 2**30 + 1` for simplicity.
 
 
-### Mojo version
+### Python `galoios` module
+
+I also tried the Python `galois` module that was available as a pip package. It implements the finite field math and uses Numpy as backend. Thus, one could use Numpy's FFT implementation over finite field elements.
+
+
+### Mojo version (`mojo/fft-mojo.mojo`)
 
 The Mojo version was implemented using the DynamicVector.
 
@@ -62,9 +67,9 @@ fn fft_over_finite_field( P: DynamicVector[FieldElement], w: FieldElement ) \
 I factored out `make_vector` and `half_vector` functions since Mojo does not yet support list comprehension. The `FieldElement` struct is defined in the [`mojo/field.mojo`](mojo/field.mojo)
 
 
-### Python `galoios` module
+### Optimized Mojo version (`mojo/fft-optimized.mojo`)
 
-I also tried the Python `galois` module that was available as a pip package. It implements the finite field math and uses Numpy as backend. Thus, one could use Numpy's FFT implementation over finite field elements.
+Michael Kowalski created a [PR](https://github.com/duckki/field-fft-mojo/pull/1) optimizing DynamicVector management and parallelization of recursions. He discovered through a profiler that most of runtime was spent allocating `DynamicVector`s. I created a separate optimized version out of his code and kept the original Mojo code for comparison.
 
 
 ## Performance
@@ -75,8 +80,10 @@ I generated a random array of size 1024 * 256 and ran FFT in each version. It wa
 | --- | --- |
 | Python standalone | 4.3244 |
 | Python `galois` module | 9.5888 |
-| Mojo | 0.0573 |
+| Mojo port | 0.0573 |
+| Mojo optimized | 0.0057 |
 
 Mojo's speedup was 75x over the standalone Python implementation.
+And the optimized version showed 758x speedup! (Thanks, Michael Kowalski!)
 
-The `galois` module turned out to be much slower even if it used Numpy's FFT implementation. I guess Numpy couldn't use the optimized C kernel, since it has to interact with `galois`'s `GF` class.
+The `galois` module turned out to be much slower even if it used Numpy's FFT implementation. I guess Numpy couldn't use the optimized C kernel, since it has to interact with `galois`'s `GF` class. This is another case of failed modularity due to the Python/C two world problem.
