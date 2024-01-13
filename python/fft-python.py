@@ -5,6 +5,7 @@ import galois
 #=============================================================================
 # Implementation of Cooley-Tukey FFT over Finite Field
 
+# `w` must be a `n`-th root of unity, where `n` is the size of `P`.
 def fft_over_finite_field( P: list[FieldElement], w: FieldElement ) -> list[FieldElement]:
     n = len(P)
     if n == 1:

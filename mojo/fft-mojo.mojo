@@ -49,6 +49,7 @@ fn half_vector( vec: DynamicVector[FieldElement], start: Int ) -> DynamicVector[
         result[i] = vec[start + i*2]
     return result
 
+# `w` must be a `n`-th root of unity, where `n` is the size of `P`.
 fn fft_over_finite_field( P: DynamicVector[FieldElement], w: FieldElement ) \
                         -> DynamicVector[FieldElement]:
     let n = len(P)

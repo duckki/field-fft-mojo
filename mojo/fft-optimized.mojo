@@ -53,7 +53,7 @@ fn half_vector( vec: DynamicVector[FieldElement], start: Int, size: Int ) -> Dyn
     return result
 
 
-fn fft_over_finite_field(
+fn _inner_fft_over_finite_field(
     inout P: DynamicVector[FieldElement],
     offset: Int,
     size: Int,
@@ -71,9 +71,9 @@ fn fft_over_finite_field(
     fn recurse( i: Int ):
         let threads_ = 0 if threads == 0 else threads // 2 - 1
         if i == 0:
-            fft_over_finite_field( P_, 0, half_size, w_square, threads_ )
+            _inner_fft_over_finite_field( P_, 0, half_size, w_square, threads_ )
         else:
-            fft_over_finite_field( P_, half_size, half_size, w_square, threads_ )
+            _inner_fft_over_finite_field( P_, half_size, half_size, w_square, threads_ )
 
     if threads == 0:
         recurse(0)
@@ -88,6 +88,15 @@ fn fft_over_finite_field(
         P[j] = u + v
         P[j + half_size] = u - v
         w_power = w_power * w
+
+# `w` must be a `n`-th root of unity, where `n` is the size of `P`.
+fn fft_over_finite_field(
+    inout P: DynamicVector[FieldElement],
+    w: FieldElement,
+    threads: Int = 0,
+):
+    let size = len(P)
+    _inner_fft_over_finite_field( P, 0, size, w, threads )
 
 
 #=============================================================================
@@ -109,7 +118,7 @@ fn main() raises:
 
     @parameter
     fn bench():
-        _ = fft_over_finite_field( values, 0, size, g, 32 )
+        _ = fft_over_finite_field( values, g, 16 )
 
     let report = benchmark.run[bench]( 1, 3, 4, 10 )
     print( "mean runtime:", report.mean("s") )
