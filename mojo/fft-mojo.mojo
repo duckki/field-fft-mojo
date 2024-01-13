@@ -1,6 +1,7 @@
 from random import random_ui64
 from field import FieldElement
 import benchmark
+from algorithm import parallelize
 
 #=============================================================================
 # Helper functions
@@ -42,33 +43,51 @@ fn to_str( vec: DynamicVector[FieldElement] ) -> String:
 #=============================================================================
 # Implementation of Cooley-Tukey FFT over Finite Field
 
-fn half_vector( vec: DynamicVector[FieldElement], start: Int ) -> DynamicVector[FieldElement]:
-    var result = make_vector( len(vec) // 2 )
-    debug_assert( start + (len(result)-1) * 2 < len(vec), "out of bounds" )
-    for i in range(len(result)):
+fn half_vector( vec: DynamicVector[FieldElement], start: Int, size: Int ) -> DynamicVector[FieldElement]:
+    var result = make_vector( size )
+    let half_size = size // 2
+    debug_assert( start + 1 + (half_size-1) * 2 < size, "out of bounds" )
+    for i in range(half_size):
         result[i] = vec[start + i*2]
+        result[i + half_size] = vec[start + i*2 + 1]
     return result
 
-fn fft_over_finite_field( P: DynamicVector[FieldElement], w: FieldElement ) \
-                        -> DynamicVector[FieldElement]:
-    let n = len(P)
-    if n == 1:
-        return P
+
+fn fft_over_finite_field(
+    inout P: DynamicVector[FieldElement],
+    offset: Int,
+    size: Int,
+    w: FieldElement,
+    threads: Int = 0,
+):
+    if size == 1:
+        return
 
     let w_square = w * w
-    let Pe = half_vector( P, 0 )
-    let Po = half_vector( P, 1 )
-    let ye = fft_over_finite_field( Pe, w_square )
-    let yo = fft_over_finite_field( Po, w_square )
-    var y = make_vector( n )
+    var P_ = half_vector( P, 0, size )
+    let half_size = size // 2
+
+    @parameter
+    fn recurse( i: Int ):
+        let threads_ = 0 if threads == 0 else threads // 2 - 1
+        if i == 0:
+            fft_over_finite_field( P_, 0, half_size, w_square, threads_ )
+        else:
+            fft_over_finite_field( P_, half_size, half_size, w_square, threads_ )
+
+    if threads == 0:
+        recurse(0)
+        recurse(1)
+    else:
+        parallelize[recurse]( 2, 2 )
+
     var w_power = FieldElement(1)
-    for j in range(n // 2):
-        let u = ye[j]
-        let v = (w_power * yo[j])
-        y[j] = u + v
-        y[j + n // 2] = u - v
+    for j in range(half_size):
+        let u = P_[j]
+        let v = (w_power * P_[half_size + j])
+        P[j] = u + v
+        P[j + half_size] = u - v
         w_power = w_power * w
-    return y
 
 
 #=============================================================================
@@ -90,7 +109,7 @@ fn main() raises:
 
     @parameter
     fn bench():
-        _ = fft_over_finite_field( values, g )
+        _ = fft_over_finite_field( values, 0, size, g, 32 )
 
     let report = benchmark.run[bench]( 1, 3, 4, 10 )
     print( "mean runtime:", report.mean("s") )
